@@ -22,7 +22,8 @@ async function connectToWhatsApp () {
         
         // જો નવો QR કોડ આવે તો સ્ક્રીન પર બતાવો
         if (qr) {
-            qrcode.generate(qr, { small: true });console.log('QR Code Link: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
+            qrcode.generate(qr, { small: true });
+            console.log('QR Code Link: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
             console.log('ઉપરનો QR કોડ તમારા WhatsApp થી સ્કેન કરો!');
         }
 
@@ -44,11 +45,13 @@ connectToWhatsApp();
 app.post('/api/send', async (req, res) => {
     try {
         const { number, message } = req.body;
-        // WhatsApp ને 91 (દેશનો કોડ) સાથે નંબર જોઈએ છે
-        const jid = "91" + number + "@s.whatsapp.net"; 
+        
+        // જો નંબરમાં આગળ 91 ન હોય તો ઉમેરશે, હોય તો એમનેમ જ રાખશે (ડબલ 91 થતા અટકાવવા)
+        let formattedNumber = number.toString().startsWith("91") ? number : "91" + number;
+        const jid = formattedNumber + "@s.whatsapp.net"; 
         
         await sock.sendMessage(jid, { text: message });
-        console.log(`મેસેજ મોકલાયો: ${number}`);
+        console.log(`મેસેજ મોકલાયો: ${formattedNumber}`);
         
         res.json({ success: true, msg: "Message Sent Successfully!" });
     } catch (err) {
@@ -60,6 +63,5 @@ app.post('/api/send', async (req, res) => {
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
-});
     console.log('🚀 API સર્વર ચાલુ થઈ ગયું છે. QR કોડની રાહ જુઓ...');
 });
