@@ -22,7 +22,7 @@ async function connectToWhatsApp () {
         
         // જો નવો QR કોડ આવે તો સ્ક્રીન પર બતાવો
         if (qr) {
-            qrcode.generate(qr, { small: true });
+            qrcode.generate(qr, { small: true });console.log('QR Code Link: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
             console.log('ઉપરનો QR કોડ તમારા WhatsApp થી સ્કેન કરો!');
         }
 
