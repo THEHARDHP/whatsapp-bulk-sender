@@ -57,6 +57,9 @@ app.post('/api/send', async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`);
+});
     console.log('🚀 API સર્વર ચાલુ થઈ ગયું છે. QR કોડની રાહ જુઓ...');
 });
