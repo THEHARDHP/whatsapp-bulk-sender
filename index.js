@@ -1,0 +1,62 @@
+const express = require('express');
+const { makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+
+const app = express();
+app.use(express.json());
+
+let sock;
+
+async function connectToWhatsApp () {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+
+    sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false, // આપણે qrcode-terminal દ્વારા જાતે પ્રિન્ટ કરીશું
+        logger: pino({ level: "silent" })
+    });
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        // જો નવો QR કોડ આવે તો સ્ક્રીન પર બતાવો
+        if (qr) {
+            qrcode.generate(qr, { small: true });
+            console.log('ઉપરનો QR કોડ તમારા WhatsApp થી સ્કેન કરો!');
+        }
+
+        if(connection === 'close') {
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
+            console.log('કનેક્શન તૂટી ગયું છે, ફરીથી જોડાઈ રહ્યું છે...', shouldReconnect);
+            if(shouldReconnect) connectToWhatsApp();
+        } else if(connection === 'open') {
+            console.log('✅ તમારું WhatsApp સફળતાપૂર્વક કનેક્ટ થઈ ગયું છે!');
+        }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+}
+
+connectToWhatsApp();
+
+// મેસેજ મોકલવા માટેની API
+app.post('/api/send', async (req, res) => {
+    try {
+        const { number, message } = req.body;
+        // WhatsApp ને 91 (દેશનો કોડ) સાથે નંબર જોઈએ છે
+        const jid = "91" + number + "@s.whatsapp.net"; 
+        
+        await sock.sendMessage(jid, { text: message });
+        console.log(`મેસેજ મોકલાયો: ${number}`);
+        
+        res.json({ success: true, msg: "Message Sent Successfully!" });
+    } catch (err) {
+        console.error("મેસેજ મોકલવામાં ભૂલ:", err);
+        res.json({ success: false, msg: "Message Failed!" });
+    }
+});
+
+app.listen(3000, () => {
+    console.log('🚀 API સર્વર ચાલુ થઈ ગયું છે. QR કોડની રાહ જુઓ...');
+});
