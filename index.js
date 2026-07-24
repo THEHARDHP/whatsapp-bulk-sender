@@ -4,7 +4,9 @@ const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 
 const app = express();
-app.use(express.json());
+// ફાઈલની સાઈઝ મોટી હોવાથી limit વધારીને 50mb કરી છે
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 let sock;
 
@@ -13,14 +15,13 @@ async function connectToWhatsApp () {
 
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // આપણે qrcode-terminal દ્વારા જાતે પ્રિન્ટ કરીશું
+        printQRInTerminal: false,
         logger: pino({ level: "silent" })
     });
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         
-        // જો નવો QR કોડ આવે તો સ્ક્રીન પર બતાવો
         if (qr) {
             qrcode.generate(qr, { small: true });
             console.log('QR Code Link: https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(qr));
@@ -41,17 +42,50 @@ async function connectToWhatsApp () {
 
 connectToWhatsApp();
 
-// મેસેજ મોકલવા માટેની API
+// મેસેજ અને ફાઈલ મોકલવા માટેની API
 app.post('/api/send', async (req, res) => {
     try {
-        const { number, message } = req.body;
+        // નવી આવેલી વિગતો (mediaBase64, mediaName, mediaMime)
+        const { number, message, mediaBase64, mediaName, mediaMime } = req.body;
         
-        // જો નંબરમાં આગળ 91 ન હોય તો ઉમેરશે, હોય તો એમનેમ જ રાખશે (ડબલ 91 થતા અટકાવવા)
         let formattedNumber = number.toString().startsWith("91") ? number : "91" + number;
         const jid = formattedNumber + "@s.whatsapp.net"; 
         
-        await sock.sendMessage(jid, { text: message });
-        console.log(`મેસેજ મોકલાયો: ${formattedNumber}`);
+        // જો ફાઈલ મોકલી હોય તો
+        if (mediaBase64 && mediaMime) {
+            const buffer = Buffer.from(mediaBase64, 'base64');
+            const captionText = message || ""; // જો મેસેજ ખાલી હોય તો બ્લેન્ક
+
+            // જો ફાઈલ ઈમેજ (Photo) હોય
+            if (mediaMime.startsWith('image/')) {
+                await sock.sendMessage(jid, { 
+                    image: buffer, 
+                    caption: captionText 
+                });
+            } 
+            // જો ફાઈલ વિડીયો હોય
+            else if (mediaMime.startsWith('video/')) {
+                await sock.sendMessage(jid, { 
+                    video: buffer, 
+                    caption: captionText 
+                });
+            } 
+            // PDF કે અન્ય કોઈ પણ ફાઈલ હોય (Document)
+            else {
+                await sock.sendMessage(jid, { 
+                    document: buffer, 
+                    mimetype: mediaMime,
+                    fileName: mediaName || 'file',
+                    caption: captionText 
+                });
+            }
+            console.log(`ફાઈલ સાથે મેસેજ મોકલાયો: ${formattedNumber}`);
+            
+        } else {
+            // જો માત્ર ટેક્સ્ટ મેસેજ હોય (ફાઈલ ન હોય)
+            await sock.sendMessage(jid, { text: message || "" });
+            console.log(`માત્ર ટેક્સ્ટ મેસેજ મોકલાયો: ${formattedNumber}`);
+        }
         
         res.json({ success: true, msg: "Message Sent Successfully!" });
     } catch (err) {
