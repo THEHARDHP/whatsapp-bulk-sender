@@ -42,6 +42,12 @@ async function connectToWhatsApp () {
 
 connectToWhatsApp();
 
+// --- નવો ઉમેરેલો કોડ: સર્વરને જાગતું રાખવા માટે (Cron-job માટે) ---
+app.get('/', (req, res) => {
+    res.send('Server is awake! WhatsApp API is running 100% fine.');
+});
+// -------------------------------------------------------------
+
 // મેસેજ અને ફાઈલ મોકલવા માટેની API
 app.post('/api/send', async (req, res) => {
     try {
